@@ -89,6 +89,6 @@ rhdp:
 
 # --- GitOps（BuildConfig のソース参照用） ---
 gitops:
-  repoUrl: ""
+  repoUrl: "https://github.com/kanekoh/rhcl-handson-chart.git"
   revision: main
   appPath: app
