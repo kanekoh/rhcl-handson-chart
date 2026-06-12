@@ -1,0 +1,8 @@
+apiVersion: v2
+name: rhcl-handson
+description: RHCL hands-on lab environment - deploys Connectivity Link, Keycloak, and sample app on OpenShift
+type: application
+version: 0.1.0
+appVersion: "1.3.0"
+maintainers:
+  - name: RHCL Workshop Developer

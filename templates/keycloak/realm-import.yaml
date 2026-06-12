@@ -1,0 +1,50 @@
+{{- if .Values.keycloak.enabled }}
+---
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: {{ .Values.keycloak.realm.name }}-realm
+  namespace: {{ .Values.keycloak.namespace }}
+  annotations:
+    {{- include "rhcl.syncWave" "25" | nindent 4 }}
+spec:
+  keycloakCRName: keycloak
+  realm:
+    realm: {{ .Values.keycloak.realm.name }}
+    enabled: true
+    roles:
+      realm:
+        - name: default-roles-{{ .Values.keycloak.realm.name }}
+          composite: true
+        - name: admin
+    clients:
+      - clientId: {{ .Values.keycloak.realm.clients.browserApp.clientId }}
+        publicClient: true
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: true
+        attributes:
+          pkce.code.challenge.method: S256
+        redirectUris:
+          - "https://{{ include "rhcl.gatewayHostname" . }}/*"
+          - "http://localhost:*/*"
+        webOrigins:
+          - "https://{{ include "rhcl.gatewayHostname" . }}"
+          - "http://localhost:*"
+      - clientId: {{ .Values.keycloak.realm.clients.serviceAccount.clientId }}
+        publicClient: false
+        serviceAccountsEnabled: true
+        standardFlowEnabled: false
+    users:
+      {{- range .Values.keycloak.realm.users }}
+      - username: {{ .username }}
+        enabled: true
+        credentials:
+          - type: password
+            value: {{ .password }}
+            temporary: false
+        realmRoles:
+          {{- range .roles }}
+          - {{ . }}
+          {{- end }}
+      {{- end }}
+{{- end }}

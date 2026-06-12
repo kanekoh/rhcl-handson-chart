@@ -1,0 +1,27 @@
+{{- if .Values.app.image.buildFromSource }}
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: {{ .Values.app.name }}
+  namespace: {{ .Values.app.namespace }}
+  annotations:
+    {{- include "rhcl.syncWave" "15" | nindent 4 }}
+spec:
+  source:
+    type: Git
+    git:
+      uri: {{ .Values.gitops.repoUrl | default "https://github.com/rhpds/field-sourced-content-template.git" }}
+      ref: {{ .Values.gitops.revision }}
+    contextDir: {{ .Values.gitops.appPath }}
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: {{ .Values.app.name }}:latest
+  triggers:
+    - type: ConfigChange
+{{- end }}

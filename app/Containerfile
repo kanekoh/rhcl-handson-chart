@@ -1,0 +1,11 @@
+FROM registry.access.redhat.com/ubi9/python-312:latest
+
+LABEL description="HTTP echo server for RHCL hands-on workshop"
+
+COPY server.py /opt/app-root/src/server.py
+
+EXPOSE 8080
+
+USER 1001
+
+CMD ["python", "/opt/app-root/src/server.py"]

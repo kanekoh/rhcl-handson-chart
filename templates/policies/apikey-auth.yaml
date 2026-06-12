@@ -1,0 +1,39 @@
+{{- if .Values.policies.apikeyAuth }}
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: apikey-auth
+  namespace: {{ .Values.app.namespace }}
+  annotations:
+    {{- include "rhcl.syncWave" "30" | nindent 4 }}
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ .Values.app.name }}
+  rules:
+    authentication:
+      api-key:
+        apiKey:
+          selector:
+            matchLabels:
+              app: {{ .Values.app.name }}
+        credentials:
+          authorizationHeader:
+            prefix: APIKEY
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: workshop-api-key
+  namespace: {{ .Values.app.namespace }}
+  labels:
+    app: {{ .Values.app.name }}
+  annotations:
+    secret.kuadrant.io/user-id: "workshop-user"
+    {{- include "rhcl.syncWave" "30" | nindent 4 }}
+type: Opaque
+stringData:
+  api_key: {{ .Values.policies.apikeyValue | quote }}
+{{- end }}

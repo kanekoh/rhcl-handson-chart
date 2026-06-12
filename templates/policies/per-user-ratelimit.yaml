@@ -1,0 +1,51 @@
+{{- if .Values.policies.perUserRateLimit }}
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: jwt-auth-with-userid
+  namespace: {{ .Values.app.namespace }}
+  annotations:
+    {{- include "rhcl.syncWave" "30" | nindent 4 }}
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ .Values.app.name }}
+  rules:
+    authentication:
+      keycloak-jwt:
+        jwt:
+          issuerUrl: {{ include "rhcl.keycloakUrl" . }}/realms/{{ .Values.keycloak.realm.name }}
+        credentials:
+          authorizationHeader:
+            prefix: Bearer
+    response:
+      success:
+        filters:
+          userid:
+            json:
+              properties:
+                userid:
+                  selector: auth.identity.sub
+---
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: per-user-ratelimit
+  namespace: {{ .Values.app.namespace }}
+  annotations:
+    {{- include "rhcl.syncWave" "30" | nindent 4 }}
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ .Values.app.name }}
+  limits:
+    per-user:
+      rates:
+        - limit: {{ .Values.policies.perUserRateLimitRate }}
+          window: {{ .Values.policies.perUserRateLimitWindow }}
+      counters:
+        - expression: auth.identity.userid
+{{- end }}

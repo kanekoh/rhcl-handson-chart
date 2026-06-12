@@ -1,0 +1,94 @@
+# RHCL Hands-on Lab Environment
+# deployer.domain のみ指定すれば、デフォルト設定で環境一式がデプロイされる
+
+# --- クラスタ情報 ---
+# helm install 時はクラスタから自動検出（ingresses.config.openshift.io/cluster）
+# RHDP 経由では AgnosticD ロールが自動注入
+# helm template 時のみ --set deployer.domain=... が必要
+deployer:
+  domain: ""    # 空の場合クラスタから自動検出
+  apiUrl: ""
+
+# --- Gateway API プロバイダ ---
+# "istio"           : OSSM 3 + Istio Gateway Controller（OCP 4.18 以前）
+# "openshift-default": OpenShift Ingress Operator（OCP 4.19 以降）
+gatewayProvider: istio
+
+# --- Operator チャネル ---
+operators:
+  certManager:
+    channel: stable-v1
+  ossm:
+    channel: stable
+  rhcl:
+    channel: stable
+
+# --- アプリケーション ---
+app:
+  namespace: rhcl-handson
+  name: echo-server
+  hostname: ""    # 空の場合 echo.<deployer.domain> を自動生成
+  replicas: 1
+  image:
+    buildFromSource: true
+    prebuilt: ""  # buildFromSource=false 時に使用するイメージ
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# --- Keycloak ---
+keycloak:
+  enabled: true
+  namespace: keycloak
+  operatorChannel: stable-v26
+  instances: 1
+  realm:
+    name: connectivity-link
+    clients:
+      browserApp:
+        clientId: browser-app
+      serviceAccount:
+        clientId: service-account
+    users:
+      - username: testuser
+        password: testpassword
+        roles:
+          - default-roles-connectivity-link
+      - username: adminuser
+        password: adminpassword
+        roles:
+          - default-roles-connectivity-link
+          - admin
+
+# --- ポリシー（ハンズオン演習用、デフォルト全て無効） ---
+policies:
+  denyAll: false
+  jwtAuth: false
+  apikeyAuth: false
+  apikeyValue: workshop-test-key-001
+  globalRateLimit: false
+  globalRateLimitRate: 5
+  globalRateLimitWindow: 10s
+  perUserRateLimit: false
+  perUserRateLimitRate: 3
+  perUserRateLimitWindow: 10s
+  overrides: false
+  overridesRate: 10
+  overridesWindow: 10s
+
+# --- RHDP 連携 ---
+rhdp:
+  enabled: false
+  applicationLabel: rhcl-handson
+  title: "RHCL Hands-on Lab"
+  instructions: "Showroom のラボガイドに従ってハンズオン演習を実施してください。"
+
+# --- GitOps（BuildConfig のソース参照用） ---
+gitops:
+  repoUrl: ""
+  revision: main
+  appPath: app
