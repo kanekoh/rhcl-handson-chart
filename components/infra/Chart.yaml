@@ -1,0 +1,6 @@
+apiVersion: v2
+name: infra
+description: Infrastructure CRs (Istio, Kuadrant) for RHCL hands-on environment
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

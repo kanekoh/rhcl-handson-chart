@@ -1,0 +1,30 @@
+{{- if eq .Values.gatewayProvider "istio" }}
+---
+apiVersion: sailoperator.io/v1
+kind: IstioCNI
+metadata:
+  name: default
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  namespace: istio-cni
+---
+apiVersion: sailoperator.io/v1
+kind: Istio
+metadata:
+  name: default
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  namespace: istio-system
+  updateStrategy:
+    type: InPlace
+{{- end }}
+---
+apiVersion: kuadrant.io/v1beta1
+kind: Kuadrant
+metadata:
+  name: kuadrant
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"

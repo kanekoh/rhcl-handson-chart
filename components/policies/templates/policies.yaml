@@ -1,0 +1,176 @@
+{{- if .Values.denyAll }}
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: deny-all
+  namespace: {{ .Values.gatewayNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: workshop-gateway
+  defaults:
+    rules:
+      authorization:
+        opa-deny:
+          opa:
+            rego: "allow = false"
+{{- end }}
+{{- if .Values.jwtAuth }}
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: jwt-auth
+  namespace: {{ .Values.appNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ .Values.appName }}
+  rules:
+    authentication:
+      keycloak-jwt:
+        jwt:
+          issuerUrl: {{ .Values.keycloakUrl }}/realms/{{ .Values.realmName }}
+        credentials:
+          authorizationHeader:
+            prefix: Bearer
+{{- end }}
+{{- if .Values.apikeyAuth }}
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: apikey-auth
+  namespace: {{ .Values.appNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ .Values.appName }}
+  rules:
+    authentication:
+      api-key:
+        apiKey:
+          selector:
+            matchLabels:
+              app: {{ .Values.appName }}
+        credentials:
+          authorizationHeader:
+            prefix: APIKEY
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: workshop-api-key
+  namespace: {{ .Values.appNamespace }}
+  labels:
+    app: {{ .Values.appName }}
+  annotations:
+    secret.kuadrant.io/user-id: "workshop-user"
+    argocd.argoproj.io/sync-wave: "30"
+type: Opaque
+stringData:
+  api_key: {{ .Values.apikeyValue | quote }}
+{{- end }}
+{{- if .Values.globalRateLimit }}
+---
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: global-ratelimit
+  namespace: {{ .Values.gatewayNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: workshop-gateway
+  defaults:
+    limits:
+      global:
+        rates:
+          - limit: {{ .Values.globalRateLimitRate }}
+            window: {{ .Values.globalRateLimitWindow }}
+{{- end }}
+{{- if .Values.perUserRateLimit }}
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: jwt-auth-with-userid
+  namespace: {{ .Values.appNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ .Values.appName }}
+  rules:
+    authentication:
+      keycloak-jwt:
+        jwt:
+          issuerUrl: {{ .Values.keycloakUrl }}/realms/{{ .Values.realmName }}
+        credentials:
+          authorizationHeader:
+            prefix: Bearer
+    response:
+      success:
+        filters:
+          userid:
+            json:
+              properties:
+                userid:
+                  selector: auth.identity.sub
+---
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: per-user-ratelimit
+  namespace: {{ .Values.appNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ .Values.appName }}
+  limits:
+    per-user:
+      rates:
+        - limit: {{ .Values.perUserRateLimitRate }}
+          window: {{ .Values.perUserRateLimitWindow }}
+      counters:
+        - expression: auth.identity.userid
+{{- end }}
+{{- if .Values.overrides }}
+---
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: override-ratelimit
+  namespace: {{ .Values.gatewayNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: workshop-gateway
+  overrides:
+    limits:
+      global:
+        rates:
+          - limit: {{ .Values.overridesRate }}
+            window: {{ .Values.overridesWindow }}
+{{- end }}

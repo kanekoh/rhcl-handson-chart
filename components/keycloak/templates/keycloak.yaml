@@ -1,0 +1,64 @@
+---
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: keycloak
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+spec:
+  instances: {{ .Values.instances }}
+  http:
+    httpEnabled: true
+  hostname:
+    strict: false
+  proxy:
+    headers: xforwarded
+---
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: {{ .Values.realm.name }}-realm
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  keycloakCRName: keycloak
+  realm:
+    realm: {{ .Values.realm.name }}
+    enabled: true
+    roles:
+      realm:
+        - name: default-roles-{{ .Values.realm.name }}
+          composite: true
+        - name: admin
+    clients:
+      - clientId: {{ .Values.realm.clients.browserApp.clientId }}
+        publicClient: true
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: true
+        attributes:
+          pkce.code.challenge.method: S256
+        redirectUris:
+          - "https://{{ .Values.hostname }}/*"
+          - "http://localhost:*/*"
+        webOrigins:
+          - "https://{{ .Values.hostname }}"
+          - "http://localhost:*"
+      - clientId: {{ .Values.realm.clients.serviceAccount.clientId }}
+        publicClient: false
+        serviceAccountsEnabled: true
+        standardFlowEnabled: false
+    users:
+      {{- range .Values.realm.users }}
+      - username: {{ .username }}
+        enabled: true
+        credentials:
+          - type: password
+            value: {{ .password }}
+            temporary: false
+        realmRoles:
+          {{- range .roles }}
+          - {{ . }}
+          {{- end }}
+      {{- end }}

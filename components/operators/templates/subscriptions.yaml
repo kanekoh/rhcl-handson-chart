@@ -1,0 +1,138 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kuadrant-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+{{- if eq .Values.gatewayProvider "istio" }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: istio-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: istio-cni
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+{{- end }}
+{{- if .Values.keycloak.enabled }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.keycloak.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+{{- end }}
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: cert-manager-operator
+  namespace: cert-manager-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  targetNamespaces:
+    - cert-manager-operator
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: openshift-cert-manager-operator
+  namespace: cert-manager-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  channel: {{ .Values.certManager.channel }}
+  installPlanApproval: Automatic
+  name: openshift-cert-manager-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+{{- if eq .Values.gatewayProvider "istio" }}
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: servicemeshoperator3
+  namespace: openshift-operators
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  channel: {{ .Values.ossm.channel }}
+  installPlanApproval: Automatic
+  name: servicemeshoperator3
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+{{- end }}
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: kuadrant-operator
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  targetNamespaces:
+    - kuadrant-system
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: rhcl-operator
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  channel: {{ .Values.rhcl.channel }}
+  installPlanApproval: Automatic
+  name: rhcl-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  {{- if eq .Values.gatewayProvider "istio" }}
+  config:
+    env:
+      - name: ISTIO_GATEWAY_CONTROLLER_NAMES
+        value: istio.io/gateway-controller
+  {{- end }}
+{{- if .Values.keycloak.enabled }}
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: keycloak-operator
+  namespace: {{ .Values.keycloak.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  targetNamespaces:
+    - {{ .Values.keycloak.namespace }}
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: rhbk-operator
+  namespace: {{ .Values.keycloak.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  channel: {{ .Values.keycloak.channel }}
+  installPlanApproval: Automatic
+  name: rhbk-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+{{- end }}
