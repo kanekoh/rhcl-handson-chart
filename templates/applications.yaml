@@ -1,0 +1,287 @@
+# App of Apps: 各コンポーネントごとに ArgoCD Application を生成
+
+{{- $repoUrl := .Values.gitops.repoUrl -}}
+{{- $revision := .Values.gitops.revision -}}
+{{- $basePath := .Values.gitops.basePath -}}
+{{- $argoNs := .Values.gitops.argocd.namespace -}}
+{{- $argoProject := .Values.gitops.argocd.project -}}
+{{- $domain := include "rhcl.clusterDomain" . -}}
+{{- $hostname := include "rhcl.gatewayHostname" . -}}
+{{- $keycloakUrl := include "rhcl.keycloakUrl" . -}}
+{{- $gwClassName := include "rhcl.gatewayClassName" . -}}
+{{- $gwNamespace := include "rhcl.gatewayNamespace" . -}}
+
+{{/* ============================================================ */}}
+{{/* Operators                                                     */}}
+{{/* ============================================================ */}}
+{{- if .Values.components.operators.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Release.Name }}-operators
+  namespace: {{ $argoNs }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ $argoProject }}
+  source:
+    repoURL: {{ $repoUrl }}
+    targetRevision: {{ $revision }}
+    path: {{ $basePath }}/components/operators
+    helm:
+      valuesObject:
+        gatewayProvider: {{ .Values.gatewayProvider }}
+        certManager:
+          channel: {{ .Values.components.operators.certManager.channel }}
+        ossm:
+          channel: {{ .Values.components.operators.ossm.channel }}
+        rhcl:
+          channel: {{ .Values.components.operators.rhcl.channel }}
+        keycloak:
+          enabled: {{ .Values.components.operators.keycloak.enabled }}
+          channel: {{ .Values.components.operators.keycloak.channel }}
+          namespace: {{ .Values.components.keycloak.namespace }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kuadrant-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+{{- end }}
+
+{{/* ============================================================ */}}
+{{/* Infra                                                         */}}
+{{/* ============================================================ */}}
+{{- if .Values.components.infra.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Release.Name }}-infra
+  namespace: {{ $argoNs }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ $argoProject }}
+  source:
+    repoURL: {{ $repoUrl }}
+    targetRevision: {{ $revision }}
+    path: {{ $basePath }}/components/infra
+    helm:
+      valuesObject:
+        gatewayProvider: {{ .Values.gatewayProvider }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kuadrant-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+{{- end }}
+
+{{/* ============================================================ */}}
+{{/* App                                                           */}}
+{{/* ============================================================ */}}
+{{- if .Values.components.app.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Release.Name }}-app
+  namespace: {{ $argoNs }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ $argoProject }}
+  source:
+    repoURL: {{ $repoUrl }}
+    targetRevision: {{ $revision }}
+    path: {{ $basePath }}/components/app
+    helm:
+      valuesObject:
+        namespace: {{ .Values.components.app.namespace }}
+        name: {{ .Values.components.app.name }}
+        replicas: {{ .Values.components.app.replicas }}
+        image:
+          buildFromSource: {{ .Values.components.app.image.buildFromSource }}
+          prebuilt: {{ .Values.components.app.image.prebuilt | quote }}
+        resources:
+          requests:
+            cpu: {{ .Values.components.app.resources.requests.cpu | quote }}
+            memory: {{ .Values.components.app.resources.requests.memory | quote }}
+          limits:
+            cpu: {{ .Values.components.app.resources.limits.cpu | quote }}
+            memory: {{ .Values.components.app.resources.limits.memory | quote }}
+        gitops:
+          repoUrl: {{ $repoUrl | quote }}
+          revision: {{ $revision | quote }}
+          appPath: app
+        deployer:
+          domain: {{ $domain | quote }}
+        keycloak:
+          enabled: {{ .Values.components.keycloak.enabled }}
+          namespace: {{ .Values.components.keycloak.namespace }}
+          realm: {{ .Values.components.keycloak.realm.name }}
+        keycloakUrl: {{ $keycloakUrl | quote }}
+        hostname: {{ $hostname | quote }}
+        rhdp:
+          enabled: {{ .Values.components.app.rhdp.enabled }}
+          applicationLabel: {{ .Values.components.app.rhdp.applicationLabel | quote }}
+          title: {{ .Values.components.app.rhdp.title | quote }}
+          instructions: {{ .Values.components.app.rhdp.instructions | quote }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.components.app.namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+{{- end }}
+
+{{/* ============================================================ */}}
+{{/* Gateway                                                       */}}
+{{/* ============================================================ */}}
+{{- if .Values.components.gateway.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Release.Name }}-gateway
+  namespace: {{ $argoNs }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ $argoProject }}
+  source:
+    repoURL: {{ $repoUrl }}
+    targetRevision: {{ $revision }}
+    path: {{ $basePath }}/components/gateway
+    helm:
+      valuesObject:
+        gatewayClassName: {{ $gwClassName }}
+        gatewayNamespace: {{ $gwNamespace }}
+        hostname: {{ $hostname | quote }}
+        appName: {{ .Values.components.app.name }}
+        appNamespace: {{ .Values.components.app.namespace }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ $gwNamespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+{{- end }}
+
+{{/* ============================================================ */}}
+{{/* Keycloak                                                      */}}
+{{/* ============================================================ */}}
+{{- if .Values.components.keycloak.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Release.Name }}-keycloak
+  namespace: {{ $argoNs }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ $argoProject }}
+  source:
+    repoURL: {{ $repoUrl }}
+    targetRevision: {{ $revision }}
+    path: {{ $basePath }}/components/keycloak
+    helm:
+      valuesObject:
+        namespace: {{ .Values.components.keycloak.namespace }}
+        instances: {{ .Values.components.keycloak.instances }}
+        hostname: {{ $hostname | quote }}
+        realm:
+          name: {{ .Values.components.keycloak.realm.name }}
+          clients:
+            browserApp:
+              clientId: {{ .Values.components.keycloak.realm.clients.browserApp.clientId }}
+            serviceAccount:
+              clientId: {{ .Values.components.keycloak.realm.clients.serviceAccount.clientId }}
+          users:
+            {{- .Values.components.keycloak.realm.users | toYaml | nindent 12 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.components.keycloak.namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+{{- end }}
+
+{{/* ============================================================ */}}
+{{/* Policies                                                      */}}
+{{/* ============================================================ */}}
+{{- if .Values.components.policies.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Release.Name }}-policies
+  namespace: {{ $argoNs }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ $argoProject }}
+  source:
+    repoURL: {{ $repoUrl }}
+    targetRevision: {{ $revision }}
+    path: {{ $basePath }}/components/policies
+    helm:
+      valuesObject:
+        gatewayNamespace: {{ $gwNamespace }}
+        appName: {{ .Values.components.app.name }}
+        appNamespace: {{ .Values.components.app.namespace }}
+        keycloakUrl: {{ $keycloakUrl | quote }}
+        realmName: {{ .Values.components.keycloak.realm.name }}
+        denyAll: {{ .Values.components.policies.denyAll }}
+        jwtAuth: {{ .Values.components.policies.jwtAuth }}
+        apikeyAuth: {{ .Values.components.policies.apikeyAuth }}
+        apikeyValue: {{ .Values.components.policies.apikeyValue | quote }}
+        globalRateLimit: {{ .Values.components.policies.globalRateLimit }}
+        globalRateLimitRate: {{ .Values.components.policies.globalRateLimitRate }}
+        globalRateLimitWindow: {{ .Values.components.policies.globalRateLimitWindow }}
+        perUserRateLimit: {{ .Values.components.policies.perUserRateLimit }}
+        perUserRateLimitRate: {{ .Values.components.policies.perUserRateLimitRate }}
+        perUserRateLimitWindow: {{ .Values.components.policies.perUserRateLimitWindow }}
+        overrides: {{ .Values.components.policies.overrides }}
+        overridesRate: {{ .Values.components.policies.overridesRate }}
+        overridesWindow: {{ .Values.components.policies.overridesWindow }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.components.app.namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+{{- end }}

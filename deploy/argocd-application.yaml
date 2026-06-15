@@ -1,0 +1,32 @@
+# ArgoCD Application CR の例
+# RHDP 経由では ocp4_workload_field_content ロールがこれを自動作成するため不要
+# スタンドアロン利用時は、このファイルを編集して oc apply -f で適用する
+#
+# 使い方:
+#   oc apply -f deploy/argocd-application.yaml
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rhcl-handson
+  namespace: openshift-gitops
+  labels:
+    demo.redhat.com/application: "rhcl-handson"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kanekoh/rhcl-handson-chart.git
+    targetRevision: main
+    path: .
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
