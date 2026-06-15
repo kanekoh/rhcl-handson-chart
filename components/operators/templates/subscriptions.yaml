@@ -82,13 +82,12 @@ spec:
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: kuadrant-operator
+  name: kuadrant
   namespace: kuadrant-system
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  targetNamespaces:
-    - kuadrant-system
+  upgradeStrategy: Default
 ---
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -114,7 +113,7 @@ spec:
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: keycloak-operator
+  name: keycloak-og
   namespace: {{ .Values.keycloak.namespace }}
   annotations:
     argocd.argoproj.io/sync-wave: "1"
