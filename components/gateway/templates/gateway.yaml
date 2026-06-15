@@ -6,6 +6,7 @@ metadata:
   namespace: {{ .Values.gatewayNamespace }}
   annotations:
     argocd.argoproj.io/sync-wave: "20"
+    networking.istio.io/service-type: ClusterIP
   labels:
     kuadrant.io/gateway: "true"
 spec:
@@ -18,6 +19,24 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: workshop-gateway
+  namespace: {{ .Values.gatewayNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "21"
+spec:
+  host: {{ .Values.hostname }}
+  port:
+    targetPort: http
+  to:
+    kind: Service
+    name: workshop-gateway-istio
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
